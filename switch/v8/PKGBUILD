@@ -28,7 +28,7 @@ pkgname=switch-v8
 # Newer is better: the consolidated WritableJitAllocation code-write path (our
 # rw/rx redirection chokepoint for Horizon W^X) is most mature on recent trunk.
 pkgver=15.0.243
-pkgrel=9
+pkgrel=10
 pkgdesc="V8 JavaScript engine (full JIT: Sparkplug+TurboFan) for Nintendo Switch / devkitA64"
 arch=('any')
 url='https://v8.dev/'
@@ -92,6 +92,15 @@ v8_enable_sparkplug = true
 v8_enable_turbofan = true
 v8_enable_maglev = true
 
+# NXJS_PATCHES_NEEDED.md #74 Track B — DrumBrake wasm interpreter for the
+# jitless (Citron / applet / \`[v8] jit = off\`) launch path. On the JIT
+# branch DrumBrake is compiled but not selected; \`--wasm-jitless\` picks
+# it. Companion patches 0010 (gni/v8.gni whitelist) + 0011 (RefArrayFill
+# PC-off gate) are required for this to build with our
+# \`v8_enable_pointer_compression = false\` and \`target_os = "horizon"\`.
+# EXPERIMENTAL — upstream V8 has NOT validated this combination.
+v8_enable_drumbrake = true
+
 # CRITICAL for cross-compiling on an arm64 host (e.g. an Apple-Silicon Mac):
 # default is TRUE, which makes mksnapshot fold the BUILD HOST's arm64 CPU
 # features into the cross-compiled snapshot builtins. The M-series host is
@@ -148,6 +157,15 @@ prepare() {
     _apply "$srcdir/v8"                     "$p/0007-v8-string-maxlength-decouple-horizon.patch"
     _apply "$srcdir/v8"                     "$p/0008-v8-marking-flags-code-page-wx-horizon.patch"
     _apply "$srcdir/v8"                     "$p/0009-v8-sweeper-skip-code-page-zeroing-horizon.patch"
+    # NXJS_PATCHES_NEEDED.md #74 Track B (EXPERIMENTAL — upstream-unblessed).
+    # 0010 extends `is_drumbrake_supported` in gni/v8.gni to allow
+    # target_os=horizon + pointer-compression-off (both required by our
+    # switch-v8 embedder ABI). 0011 guards the one PC-hardcoded static_assert
+    # in the s2s_RefArrayFill instruction handler so the tree compiles under
+    # PC-off. Wasm-gc array.fill on ref arrays is not exercised by our target
+    # apps; see the C-pre static audit for the full picture.
+    _apply "$srcdir/v8"                     "$p/0010-drumbrake-horizon-whitelist.patch"
+    _apply "$srcdir/v8"                     "$p/0011-drumbrake-refarrayfill-pc-off-gate.patch"
 
     # Horizon platform backend sources + custom GN toolchain.
     install -d "$srcdir/v8/src/base/platform/horizon"

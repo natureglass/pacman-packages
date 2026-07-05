@@ -1,0 +1,25 @@
+diff --git a/gni/v8.gni b/gni/v8.gni
+index 6334faf..20f6ce6 100644
+--- a/gni/v8.gni
++++ b/gni/v8.gni
+@@ -346,12 +346,18 @@ if (v8_enable_pointer_compression == "") {
+ 
+ # The Wasm interpreter is currently supported only on arm64 and x64, on
+ # Windows, Linux, MacOS and tvOS.
++#
++# switch-v8 (NXJS_PATCHES_NEEDED.md #74 Track B, EXPERIMENTAL, upstream-
++# unblessed): dropped the `v8_enable_pointer_compression &&` conjunct and
++# added `target_os == "horizon"` to the OS whitelist. Horizon + PC-off combo
++# is NOT tested by V8 upstream. See companion patch 0011 for the single
++# compile-time PC assertion this bypass exposes.
+ is_drumbrake_supported =
+-    v8_enable_webassembly && v8_enable_pointer_compression &&
++    v8_enable_webassembly &&
+     (v8_current_cpu == "x64" || v8_current_cpu == "arm64" ||
+      v8_current_cpu == "riscv64") &&
+     (target_os == "win" || target_os == "linux" || target_os == "mac" ||
+-     target_os == "ios")
++     target_os == "ios" || target_os == "horizon")
+ 
+ # Turbofan is enabled by default, except in lite mode.
+ if (v8_enable_turbofan == "") {

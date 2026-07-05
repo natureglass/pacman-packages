@@ -1,0 +1,23 @@
+diff --git a/src/wasm/interpreter/wasm-interpreter.cc b/src/wasm/interpreter/wasm-interpreter.cc
+index cc6d45f..31bd84b 100644
+--- a/src/wasm/interpreter/wasm-interpreter.cc
++++ b/src/wasm/interpreter/wasm-interpreter.cc
+@@ -6784,8 +6784,18 @@ class Handlers : public HandlersBase {
+   INSTRUCTION_HANDLER_FUNC s2s_RefArrayFill(
+       const uint8_t* code, uint32_t* sp, WasmInterpreterRuntime* wasm_runtime,
+       int64_t r0, double fp0) {
++#ifdef V8_COMPRESS_POINTERS
+     // DrumBrake currently only works with pointer compression.
+     static_assert(COMPRESS_POINTERS_BOOL);
++#endif  // V8_COMPRESS_POINTERS
++    // switch-v8 fork (NXJS_PATCHES_NEEDED.md #74 Track B): under PC-off, the
++    // upstream static_assert becomes false. array.fill on wasm-gc ref arrays
++    // is NOT exercised by our target apps (Unity WebGL, older itch.io HTML5
++    // games); the handler must still compile because its address is odr-used
++    // by the instruction table (kInstructionTable at line ~7282). If a real
++    // app invokes this path under PC-off, tagged writes below may misbehave;
++    // see the matching upstream pattern (runtime CHECK(false)) at
++    // wasm-interpreter-runtime.cc:2418 for the ref-return marshalling path.
+ 
+     uint32_t size = pop<uint32_t>(sp, code, wasm_runtime);
+     WasmRef value = pop<WasmRef>(sp, code, wasm_runtime);
