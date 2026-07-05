@@ -1,23 +1,35 @@
 diff --git a/src/wasm/interpreter/wasm-interpreter.cc b/src/wasm/interpreter/wasm-interpreter.cc
-index cc6d45f..31bd84b 100644
+index cc6d45f..4aca6e4 100644
 --- a/src/wasm/interpreter/wasm-interpreter.cc
 +++ b/src/wasm/interpreter/wasm-interpreter.cc
-@@ -6784,8 +6784,18 @@ class Handlers : public HandlersBase {
+@@ -6784,6 +6784,7 @@ class Handlers : public HandlersBase {
    INSTRUCTION_HANDLER_FUNC s2s_RefArrayFill(
        const uint8_t* code, uint32_t* sp, WasmInterpreterRuntime* wasm_runtime,
        int64_t r0, double fp0) {
 +#ifdef V8_COMPRESS_POINTERS
      // DrumBrake currently only works with pointer compression.
      static_assert(COMPRESS_POINTERS_BOOL);
-+#endif  // V8_COMPRESS_POINTERS
-+    // switch-v8 fork (NXJS_PATCHES_NEEDED.md #74 Track B): under PC-off, the
-+    // upstream static_assert becomes false. array.fill on wasm-gc ref arrays
-+    // is NOT exercised by our target apps (Unity WebGL, older itch.io HTML5
-+    // games); the handler must still compile because its address is odr-used
-+    // by the instruction table (kInstructionTable at line ~7282). If a real
-+    // app invokes this path under PC-off, tagged writes below may misbehave;
-+    // see the matching upstream pattern (runtime CHECK(false)) at
-+    // wasm-interpreter-runtime.cc:2418 for the ref-return marshalling path.
  
-     uint32_t size = pop<uint32_t>(sp, code, wasm_runtime);
-     WasmRef value = pop<WasmRef>(sp, code, wasm_runtime);
+@@ -6813,6 +6814,22 @@ class Handlers : public HandlersBase {
+     }
+ 
+     NextOp();
++#else   // V8_COMPRESS_POINTERS
++    // switch-v8 fork (NXJS_PATCHES_NEEDED.md #74 Track B): array.fill on
++    // wasm-gc ref arrays is unsupported under pointer-compression-off.
++    // The handler must still exist because its address is odr-used by
++    // kInstructionTable (see instruction-handlers.h:1325 and the
++    // Handlers<false>::V(...) expansion at ~line 7282 below), so we keep
++    // the signature and replace the body with a deterministic hard
++    // failure. Matches upstream's `CHECK(false); // Not supported` in
++    // wasm-interpreter-runtime.cc:2418 for the ref-return marshalling
++    // path. Target apps (Unity WebGL, older itch.io HTML5 games) never
++    // exercise wasm-gc array.fill, so this crash is a policy guardrail
++    // against silent misbehaviour, not a runtime path expected to fire.
++    FATAL(
++        "DrumBrake: wasm-GC ref array.fill unsupported under PC-off "
++        "(switch-v8 #74)");
++#endif  // V8_COMPRESS_POINTERS
+   }
+ 
+   INSTRUCTION_HANDLER_FUNC s2s_RefI31(const uint8_t* code, uint32_t* sp,
